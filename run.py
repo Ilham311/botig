@@ -7,7 +7,7 @@ import tempfile
 import threading
 import time
 
-TOKEN_BOT = "5219568853:AAGtBalJ9so4Zld57PiXEOWBfS--ukrQRK4"
+TOKEN_BOT = "5219568853:AAF1-nRCJSOJqHY7r1S2QEM3n74EVRaUU6Y"
 bot = telebot.TeleBot(TOKEN_BOT)
 
 CHANNEL_USERNAME = "@BypasserID"
