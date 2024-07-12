@@ -6,8 +6,9 @@ import io
 import tempfile
 import threading
 import time
+import random
 
-TOKEN_BOT = "5219568853:AAF1-nRCJSOJqHY7r1S2QEM3n74EVRaUU6Y"
+TOKEN_BOT = "5219568853:AAGtBalJ9so4Zld57PiXEOWBfS--ukrQRK4"
 bot = telebot.TeleBot(TOKEN_BOT)
 
 CHANNEL_USERNAME = "@BypasserID"
@@ -44,6 +45,27 @@ def get_facebook_video_url(fb_url):
         print(f"Response content: {response.text}")
         return None
 
+proxies_list = [
+    "45.127.248.127:5128:zwxzcxda:0j21sg2jap67",
+    "207.244.217.165:6712:zwxzcxda:0j21sg2jap67",
+    "134.73.69.7:5997:zwxzcxda:0j21sg2jap67",
+    "64.64.118.149:6732:zwxzcxda:0j21sg2jap67",
+    "157.52.253.244:6204:zwxzcxda:0j21sg2jap67",
+    "167.160.180.203:6754:zwxzcxda:0j21sg2jap67",
+    "166.88.58.10:5735:zwxzcxda:0j21sg2jap67",
+    "173.0.9.70:5653:zwxzcxda:0j21sg2jap67",
+    "204.44.69.89:6342:zwxzcxda:0j21sg2jap67",
+    "173.0.9.209:5792:zwxzcxda:0j21sg2jap67"
+]
+
+def get_proxy():
+    proxy = random.choice(proxies_list)
+    ip_port, user, password = proxy.rsplit(':', 2)
+    return {
+        "http": f"http://{user}:{password}@{ip_port}",
+        "https": f"https://{user}:{password}@{ip_port}"
+    }
+
 def get_instagram_video_url(ig_url):
     shortcode = re.search(r'/(?:p|reel)/([^/]+)/', ig_url)
     if shortcode:
@@ -52,10 +74,11 @@ def get_instagram_video_url(ig_url):
         query_url = f"https://www.instagram.com/graphql/query/?doc_id=24852649951017035&variables={requests.utils.quote(json.dumps(variables))}"
         
         try:
-            response = requests.get(query_url)
+            proxies = get_proxy()
+            response = requests.get(query_url, proxies=proxies)
             response.raise_for_status()
             data = response.json()
-            return data['data']['xdt_shortcode_media']['video_url']
+            return data['data']['shortcode_media']['video_url']
         except requests.exceptions.RequestException as e:
             print(f"Request error: {e}")
             return None
@@ -188,4 +211,4 @@ while True:
         bot.polling()
     except Exception as e:
         print(f"Bot crash: {str(e)}")
-        time.sleep(3)  # Delay for 3 seconds before attempting to restart
+        time.sleep(3)  
