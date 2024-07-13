@@ -44,27 +44,6 @@ def get_facebook_video_url(fb_url):
         print(f"Response content: {response.text}")
         return None
 
-def get_instagram_video_url(ig_url):
-    shortcode = re.search(r'/(?:p|reel)/([^/]+)/', ig_url)
-    if shortcode:
-        shortcode = shortcode.group(1)
-        variables = {"shortcode": shortcode}
-        query_url = f"https://www.instagram.com/graphql/query/?doc_id=24852649951017035&variables={requests.utils.quote(json.dumps(variables))}"
-        
-        try:
-            response = requests.get(query_url)
-            response.raise_for_status()
-            data = response.json()
-            return data['data']['xdt_shortcode_media']['video_url']
-        except requests.exceptions.RequestException as e:
-            print(f"Request error: {e}")
-            return None
-        except ValueError as e:
-            print(f"JSON decoding error: {e}")
-            print(f"Response content: {response.text}")
-            return None
-    return None
-
 def download_and_upload_video(chat_id, user_id, platform, url):
     try:
         progress_data[user_id] = True
@@ -73,7 +52,12 @@ def download_and_upload_video(chat_id, user_id, platform, url):
         if platform == 'Facebook':
             video_url = get_facebook_video_url(url)
         elif platform == 'Instagram':
-            video_url = get_instagram_video_url(url)
+            response = requests.post(
+                'https://api.cobalt.tools/api/json',
+                json={'url': url, 'vQuality': '1080'},
+                headers={'Accept': 'application/json'}
+            )
+            video_url = response.json().get('url')
         else:
             headers = {
                 "Accept": "application/json",
