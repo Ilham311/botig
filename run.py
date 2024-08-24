@@ -1,19 +1,49 @@
 import telebot
 import requests
-import json
-import re
 import io
 import tempfile
 import threading
 import time
 
-TOKEN_BOT = "5219568853:AAF1-nRCJSOJqHY7r1S2QEM3n74EVRaUU6Y"
+TOKEN_BOT = "5219568853:AAGHeoGpVXMCHxqK20kYsp5nGSHFEOQt4eQ"
 bot = telebot.TeleBot(TOKEN_BOT)
 
 CHANNEL_USERNAME = "@BypasserID"
 
 # Dictionary to store progress information for each user
 progress_data = {}
+
+def get_instagram_video_url(ig_url):
+    api_url = "https://instagram-scraper-api2.p.rapidapi.com/v1/post_info"
+    querystring = {"code_or_id_or_url": ig_url}
+    
+    headers = {
+        "user-agent": "Dart/3.4 (dart:io)",
+        "accept": "application/json",
+        "x-rapidapi-key": "e72d7fe905mshb603635026144d7p1c183djsna65326362225",
+        "accept-encoding": "gzip",
+        "host": "instagram-scraper-api2.p.rapidapi.com"
+    }
+
+    try:
+        response = requests.get(api_url, headers=headers, params=querystring)
+        response.raise_for_status()
+        data = response.json()
+        
+        video_url = data.get("video_url")
+        if not video_url:
+            # Telusuri lebih dalam jika video_url tidak ditemukan di level atas
+            for key, value in data.items():
+                if isinstance(value, dict):
+                    video_url = value.get("video_url")
+                    if video_url:
+                        break
+        
+        return video_url
+
+    except requests.exceptions.RequestException as e:
+        print(f"Request error: {e}")
+        return None
 
 def get_facebook_video_url(fb_url):
     url = 'https://aiovideodownloader.com/api/facebook'
@@ -49,15 +79,10 @@ def download_and_upload_video(chat_id, user_id, platform, url):
         progress_data[user_id] = True
         msg_download = bot.send_message(chat_id, f"Sedang mengunduh video dari {platform}...")
 
-        if platform == 'Facebook':
+        if platform == 'Instagram':
+            video_url = get_instagram_video_url(url)
+        elif platform == 'Facebook':
             video_url = get_facebook_video_url(url)
-        elif platform == 'Instagram':
-            response = requests.post(
-                'https://api.cobalt.tools/api/json',
-                json={'url': url, 'vQuality': '1080'},
-                headers={'Accept': 'application/json'}
-            )
-            video_url = response.json().get('url')
         else:
             headers = {
                 "Accept": "application/json",
@@ -76,9 +101,6 @@ def download_and_upload_video(chat_id, user_id, platform, url):
             # Download video directly to memory without saving to a temporary file
             video_response = requests.get(video_url, stream=False)
             video_content = io.BytesIO(video_response.content)
-
-            # Generate a random temporary filename with .mp4 extension
-            temp_filename = tempfile.NamedTemporaryFile(suffix=".mp4").name
 
             # Upload the video directly
             bot.send_video(chat_id, video_content, timeout=40, supports_streaming=True)
