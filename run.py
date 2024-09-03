@@ -3,6 +3,7 @@ import requests
 import asyncio
 import json
 import tgcrypto
+import re
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from urllib.parse import urlparse
@@ -110,7 +111,18 @@ async def download_and_upload_command(client, message: Message):
     user_id = message.from_user.id
     
     try:
-        url = message.text.strip()
+        text = message.text.strip()
+
+        # Regular expression to detect URLs
+        url_pattern = re.compile(r'https?://(?:[-\w.]|(?:%[\da-fA-F]{2}))+')
+        url_match = url_pattern.search(text)
+        
+        if not url_match:
+            await client.send_message(chat_id, "Domain tidak dikenali. Ketik /help untuk bantuan.")
+            return
+
+        url = url_match.group(0)
+        
         if user_id in progress_data:
             await client.send_message(chat_id, "Anda masih memiliki proses unduhan/upload sebelumnya yang sedang berjalan.")
         else:
