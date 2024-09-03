@@ -2,7 +2,6 @@ import io
 import requests
 import asyncio
 import json
-import tgcrypto
 from pyrogram import Client, filters
 
 API_ID = 961780
@@ -54,6 +53,23 @@ def get_instagram_video_url(ig_url):
     except requests.exceptions.RequestException as e:
         print(f"Request error: {e}")
         return None
+ Facebook(url):
+    headers = {
+        'authorization': 'erg4t5hyj6u75u64y5ht4gf3er4gt5hy6uj7k8l9',
+        'accept-encoding': 'gzip',
+        'user-agent': 'okhttp/4.12.0'
+    }
+
+    response = requests.get(url, headers=headers)
+
+    if response.status_code == 200:
+        data = response.json()
+        if 'media' in data and data['media'][0]['is_video']:
+            return data['media'][0]['video_url']
+        else:
+            return None
+    else:
+        return None
 
 # Function to get video URL for other platforms
 def get_video_url(url, platform):
@@ -72,7 +88,7 @@ async def handle_instagram(client, chat_id, url):
     await download_and_upload(client, chat_id, video_url)
 
 async def handle_facebook(client, chat_id, url):
-    video_url = get_video_url(url, 'Facebook')
+    video_url = Facebook(url)  
     await download_and_upload(client, chat_id, video_url)
 
 async def handle_youtube(client, chat_id, url):
