@@ -3,10 +3,7 @@ import requests
 import asyncio
 import json
 import tgcrypto
-import re
 from pyrogram import Client, filters
-from pyrogram.types import Message
-from urllib.parse import urlparse
 
 API_ID = 961780
 API_HASH = "bbbfa43f067e1e8e2fb41f334d32a6a7"
@@ -35,6 +32,7 @@ def get_tiktok_play_url(api_url):
     except json.JSONDecodeError:
         return None
 
+# Function to get Instagram video URL
 def get_instagram_video_url(ig_url):
     url = "https://backend.live/rapid"
     headers = {
@@ -43,8 +41,9 @@ def get_instagram_video_url(ig_url):
         "accept-encoding": "gzip",
         "user-agent": "okhttp/5.0.0-alpha.10"
     }
+    data = {"url": ig_url}
     try:
-        response = requests.post(url, headers=headers, json={"url": ig_url})
+        response = requests.post(url, headers=headers, json=data)
         response.raise_for_status()
         response_data = response.json()
         return response_data.get("video_url", None)
@@ -52,15 +51,22 @@ def get_instagram_video_url(ig_url):
         print(f"Request error: {e}")
         return None
 
+    except requests.exceptions.RequestException as e:
+        print(f"Request error: {e}")
+        return None
+
+# Function to get video URL for other platforms
 def get_video_url(url, platform):
     headers = {
         "Accept": "application/json",
         "Content-Type": "application/json"
     }
-    response = requests.post("https://co.wuk.sh/api/json", headers=headers, json={"url": url})
+    data = {"url": url}
+    response = requests.post("https://co.wuk.sh/api/json", headers=headers, json=data)
     result = response.json()
     return result.get("url", None)
 
+# Download and upload functions for each platform
 async def handle_instagram(client, chat_id, url):
     video_url = get_instagram_video_url(url)
     await download_and_upload(client, chat_id, video_url)
@@ -74,10 +80,11 @@ async def handle_youtube(client, chat_id, url):
     await download_and_upload(client, chat_id, video_url)
 
 async def handle_tiktok(client, chat_id, url):
+    # Menggunakan TikWM API untuk mendapatkan play URL
     tikwm_api_url = f'https://www.tikwm.com/api/?url={url}'
     video_url = get_tiktok_play_url(tikwm_api_url)
 
-    if not video_url:
+    if not video_url:  # Jika TikWM gagal, coba gunakan API default
         video_url = get_video_url(url, 'TikTok')
 
     await download_and_upload(client, chat_id, video_url)
@@ -86,6 +93,7 @@ async def handle_twitter(client, chat_id, url):
     video_url = get_video_url(url, 'Twitter')
     await download_and_upload(client, chat_id, video_url)
 
+# Function to download and upload video
 async def download_and_upload(client, chat_id, video_url):
     if video_url:
         upload_msg = await client.send_message(chat_id, "Video berhasil diunduh. Sedang mengunggah...")
@@ -97,6 +105,7 @@ async def download_and_upload(client, chat_id, video_url):
     else:
         await client.send_message(chat_id, "Terjadi kesalahan saat mengambil URL video.")
 
+# Function to delete messages after some time
 async def delete_messages(client, chat_id, *message_ids):
     for message_id in message_ids:
         try:
@@ -104,56 +113,49 @@ async def delete_messages(client, chat_id, *message_ids):
         except Exception as e:
             print(f"Failed to delete message {message_id}: {e}")
 
-
-@app.on_message(filters.text & (filters.private | filters.group))
-async def download_and_upload_command(client, message: Message):
+@app.on_message(filters.command(['ig', 'yt', 'tw', 'tt', 'fb']))
+async def download_and_upload_command(client, message):
     chat_id = message.chat.id
     user_id = message.from_user.id
     
     try:
-        text = message.text.strip()
-
-        # Regular expression to detect URLs
-        url_pattern = re.compile(r'https?://(?:[-\w.]|(?:%[\da-fA-F]{2}))+')
-        url_match = url_pattern.search(text)
-        
-        if not url_match:
-            await client.send_message(chat_id, "Domain tidak dikenali. Ketik /help untuk bantuan.")
-            return
-
-        url = url_match.group(0)
-        
-        if user_id in progress_data:
-            await client.send_message(chat_id, "Anda masih memiliki proses unduhan/upload sebelumnya yang sedang berjalan.")
-        else:
-            progress_data[user_id] = True
-            domain = urlparse(url).netloc.lower()
-            
-            if "instagram.com" in domain:
-                await handle_instagram(client, chat_id, url)
-            elif "facebook.com" in domain:
-                await handle_facebook(client, chat_id, url)
-            elif "youtube.com" in domain or "youtu.be" in domain:
-                await handle_youtube(client, chat_id, url)
-            elif "tiktok.com" in domain:
-                await handle_tiktok(client, chat_id, url)
-            elif "twitter.com" in domain:
-                await handle_twitter(client, chat_id, url)
+        command, *args = message.text.split(maxsplit=1)
+        if len(args) == 1:
+            url = args[0]
+            if user_id in progress_data:
+                await client.send_message(chat_id, f"Anda masih memiliki proses unduhan/upload sebelumnya yang sedang berjalan.")
             else:
-                await client.send_message(chat_id, "Domain tidak dikenali. Ketik /help untuk bantuan.")
-            
-            del progress_data[user_id]
+                progress_data[user_id] = True
+                platform_handlers = {
+                    '/ig': handle_instagram,
+                    '/fb': handle_facebook,
+                    '/yt': handle_youtube,
+                    '/tt': handle_tiktok,
+                    '/tw': handle_twitter
+                }
+                handler = platform_handlers.get(command)
+                if handler:
+                    await handler(client, chat_id, url)
+                else:
+                    await client.send_message(chat_id, "Perintah salah. Ketik /help untuk bantuan.")
+                del progress_data[user_id]
+        else:
+            await client.send_message(chat_id, "Perintah salah. Ketik /help untuk bantuan.")
     except Exception as e:
         await client.send_message(chat_id, f"Terjadi kesalahan: {str(e)}")
         if user_id in progress_data:
             del progress_data[user_id]
 
 @app.on_message(filters.command(['start', 'help']))
-async def send_welcome(client, message: Message):
+async def send_welcome(client, message):
     help_message = """
-📷 Kirimkan link Instagram, YouTube, TikTok, Twitter, atau Facebook, dan bot akan mengunduh serta mengunggah video tersebut.
+📷 /ig [URL] - Unduh video Instagram
+📺 /yt [URL] - Ambil video YouTube
+🐦 /tw [URL] - Download video Twitter
+🎵 /tt [URL] - Unduh video TikTok
+📘 /fb [URL] - Unduh video Facebook
 """
-    await client.reply_text(f"Selamat datang! Gunakan bot ini dengan mengirimkan URL:\n{help_message}")
+    await client.reply_text(f"Selamat datang! Gunakan perintah berikut:\n{help_message}")
 
+# Run the bot
 app.run()
-
