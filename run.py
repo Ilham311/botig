@@ -2,6 +2,7 @@ import io
 import requests
 import asyncio
 import json
+import tgcrypto
 from pyrogram import Client, filters
 
 API_ID = 961780
