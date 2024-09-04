@@ -1,7 +1,10 @@
 import io
+import re
+import string
+import random
+import time
 import requests
 import asyncio
-import json
 import tgcrypto
 from pyrogram import Client, filters
 
@@ -16,6 +19,71 @@ progress_data = {}
 
 async def progress(current, total):
     print(f"{current * 100 / total:.1f}%")
+
+# Fungsi untuk download video Doodstream
+def dood_download(url, file_path):
+    def dood_decode(data):
+        t = string.ascii_letters + string.digits
+        return data + ''.join([random.choice(t) for _ in range(10)])
+    
+    def append_headers(headers):
+        return ''.join([f'&{key}={value}' for key, value in headers.items()])
+    
+    def extract_host_media_id(url):
+        pattern = r'(?://|\.)((?:do*0*o*0*ds?(?:tream)?|ds2(?:play|video))\.' \
+                  r'(?:com?|watch|to|s[ho]|cx|l[ai]|w[sf]|pm|re|yt|stream|pro))/(?:d|e)/([0-9a-zA-Z]+)'
+        match = re.search(pattern, url)
+        if match:
+            return match.group(1), match.group(2)
+        else:
+            raise ValueError("Invalid DoodStream URL")
+    
+    RAND_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+
+    host, media_id = extract_host_media_id(url)
+    
+    if any(host.endswith(x) for x in ['.cx', '.wf']):
+        host = 'dood.so'
+    
+    web_url = f'https://{host}/d/{media_id}'
+    headers = {'User-Agent': RAND_UA, 'Referer': f'https://{host}/'}
+
+    r = requests.get(web_url, headers=headers)
+    if r.url != web_url:
+        host = re.findall(r'(?://|\.)([^/]+)', r.url)[0]
+        web_url = f'https://{host}/d/{media_id}'
+    headers.update({'Referer': web_url})
+    html = r.text
+
+    match = re.search(r'<iframe\s*src="([^"]+)', html)
+    if match:
+        url = f'https://{host}{match.group(1)}'
+        html = requests.get(url, headers=headers).text
+    else:
+        url = web_url.replace('/d/', '/e/')
+        html = requests.get(url, headers=headers).text
+
+    match = re.search(r'''dsplayer\.hotkeys[^']+'([^']+).+?function\s*makePlay.+?return[^?]+([^"]+)''', html, re.DOTALL)
+    if match:
+        token = match.group(2)
+        url = f'https://{host}{match.group(1)}'
+        html = requests.get(url, headers=headers).text
+        if 'cloudflarestorage.' in html:
+            vid_src = html.strip() + append_headers(headers)
+        else:
+            vid_src = dood_decode(html) + token + str(int(time.time() * 1000)) + append_headers(headers)
+        
+        response = requests.get(vid_src, stream=True, headers=headers)
+        if response.status_code == 200:
+            with open(file_path, 'wb') as file:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        file.write(chunk)
+            print(f'Download completed')
+        else:
+            print(f'Failed to download file')
+    else:
+        print('Video Not Found')
 
 # Fungsi baru untuk mendapatkan URL video Facebook
 def Facebook(api_url, fb_url):
@@ -80,7 +148,7 @@ def get_video_url(url, platform):
         "Content-Type": "application/json"
     }
     data = {"url": url}
-    response = requests.post("https://co.wuk.sh/api/json", headers=headers, json=data)
+    response = requests.post("https://co.wuk.sh/api/json", headers=headers, json(data))
     result = response.json()
     return result.get("url", None)
 
@@ -131,8 +199,9 @@ async def delete_messages(client, chat_id, *message_ids):
         except Exception as e:
             print(f"Failed to delete message {message_id}: {e}")
 
-@app.on_message(filters.command(['ig', 'yt', 'tw', 'tt', 'fb']))
-async def download_and_upload_command(client, message):
+# Handler baru untuk perintah /do
+@app.on_message(filters.command(['do']))
+async def handle_dood_download(client, message):
     chat_id = message.chat.id
     user_id = message.from_user.id
     
@@ -140,22 +209,20 @@ async def download_and_upload_command(client, message):
         command, *args = message.text.split(maxsplit=1)
         if len(args) == 1:
             url = args[0]
+            file_path = "video.mp4"  # Lokasi file yang akan diunduh
+
             if user_id in progress_data:
                 await client.send_message(chat_id, f"Anda masih memiliki proses unduhan/upload sebelumnya yang sedang berjalan.")
             else:
                 progress_data[user_id] = True
-                platform_handlers = {
-                    '/ig': handle_instagram,
-                    '/fb': handle_facebook,
-                    '/yt': handle_youtube,
-                    '/tt': handle_tiktok,
-                    '/tw': handle_twitter
-                }
-                handler = platform_handlers.get(command)
-                if handler:
-                    await handler(client, chat_id, url)
-                else:
-                    await client.send_message(chat_id, "Perintah salah. Ketik /help untuk bantuan.")
+                # Memulai unduhan
+                await client.send_message(chat_id, "Memulai unduhan...")
+                
+                # Panggil fungsi dood_download
+                dood_download(url, file_path)
+                
+                # Mengirim file ke Telegram setelah diunduh
+                await client.send_video(chat_id, file_path, supports_streaming=True)
                 del progress_data[user_id]
         else:
             await client.send_message(chat_id, "Perintah salah. Ketik /help untuk bantuan.")
@@ -172,8 +239,9 @@ async def send_welcome(client, message):
 🐦 /tw [URL] - Download video Twitter
 🎵 /tt [URL] - Unduh video TikTok
 📘 /fb [URL] - Unduh video Facebook
+💾 /do [URL] - Unduh video dari Doodstream
 """
     await client.reply_text(f"Selamat datang! Gunakan perintah berikut:\n{help_message}")
 
-# Run the bot
+# Menjalankan bot
 app.run()
