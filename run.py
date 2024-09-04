@@ -1,11 +1,11 @@
 import io
-import re
+import requests
+import asyncio
+import json
 import string
 import random
 import time
-import requests
-import asyncio
-import tgcrypto
+import re
 from pyrogram import Client, filters
 
 API_ID = 961780
@@ -20,7 +20,6 @@ progress_data = {}
 async def progress(current, total):
     print(f"{current * 100 / total:.1f}%")
 
-# Fungsi untuk download video Doodstream
 def dood_download(url):
     def dood_decode(data):
         t = string.ascii_letters + string.digits
@@ -73,35 +72,19 @@ def dood_download(url):
         else:
             vid_src = dood_decode(html) + token + str(int(time.time() * 1000)) + append_headers(headers)
         
-        response = requests.get(vid_src, stream=True, headers=headers)
-        if response.status_code == 200:
-            video_content = io.BytesIO()
-            for chunk in response.iter_content(chunk_size=8192):
-                if chunk:
-                    video_content.write(chunk)
-            video_content.seek(0)  # Reset pointer to the start of the BytesIO object
-            return video_content
-        else:
-            print(f'Failed to download file')
-            return None
+        return vid_src
     else:
-        print('Video Not Found')
-        return None
+        raise ValueError('Video Link Not Found')
 
-
-# Fungsi baru untuk mendapatkan URL video Facebook
+# Functions for other platforms
 def Facebook(api_url, fb_url):
     headers = {
         'authorization': 'erg4t5hyj6u75u64y5ht4gf3er4gt5hy6uj7k8l9',
         'accept-encoding': 'gzip',
         'user-agent': 'okhttp/4.12.0'
     }
-
-    # Format ulang api_url dengan fb_url
     full_url = f"{api_url}?url={fb_url}"
-
     response = requests.get(full_url, headers=headers)
-
     if response.status_code == 200:
         data = response.json()
         if 'media' in data and data['media'][0]['is_video']:
@@ -118,7 +101,6 @@ def get_tiktok_play_url(api_url):
         'Host': 'www.tikwm.com',
         'Connection': 'Keep-Alive'
     })
-
     try:
         data = json.loads(response.text)
         play_url = data.get('data', {}).get('play')
@@ -126,7 +108,6 @@ def get_tiktok_play_url(api_url):
     except json.JSONDecodeError:
         return None
 
-# Function to get Instagram video URL
 def get_instagram_video_url(ig_url):
     url = "https://backend.live/rapid"
     headers = {
@@ -145,7 +126,6 @@ def get_instagram_video_url(ig_url):
         print(f"Request error: {e}")
         return None
 
-# Function to get video URL for other platforms
 def get_video_url(url, platform):
     headers = {
         "Accept": "application/json",
@@ -156,14 +136,14 @@ def get_video_url(url, platform):
     result = response.json()
     return result.get("url", None)
 
-# Download and upload functions for each platform
+# Handler functions for different platforms
 async def handle_instagram(client, chat_id, url):
     video_url = get_instagram_video_url(url)
     await download_and_upload(client, chat_id, video_url)
 
 async def handle_facebook(client, chat_id, url):
     api_url = 'https://vdfr.aculix.net/fb'
-    video_url = Facebook(api_url, url)  # Menggunakan fungsi Facebook yang baru
+    video_url = Facebook(api_url, url)
     await download_and_upload(client, chat_id, video_url)
 
 async def handle_youtube(client, chat_id, url):
@@ -173,10 +153,8 @@ async def handle_youtube(client, chat_id, url):
 async def handle_tiktok(client, chat_id, url):
     tikwm_api_url = f'https://www.tikwm.com/api/?url={url}'
     video_url = get_tiktok_play_url(tikwm_api_url)
-
     if not video_url:
         video_url = get_video_url(url, 'TikTok')
-
     await download_and_upload(client, chat_id, video_url)
 
 async def handle_twitter(client, chat_id, url):
@@ -185,15 +163,18 @@ async def handle_twitter(client, chat_id, url):
 
 # Function to download and upload video
 async def download_and_upload(client, chat_id, video_url):
-    if video_url:
-        upload_msg = await client.send_message(chat_id, "Video berhasil diunduh. Sedang mengunggah...")
-        video_response = requests.get(video_url, stream=True)
-        video_content = io.BytesIO(video_response.content)
-        video_content.name = "video.mp4"
-        await client.send_video(chat_id, video_content, supports_streaming=True, progress=progress)
-        asyncio.create_task(delete_messages(client, chat_id, upload_msg.id))
-    else:
-        await client.send_message(chat_id, "Terjadi kesalahan saat mengambil URL video.")
+    try:
+        if video_url:
+            upload_msg = await client.send_message(chat_id, "Video berhasil diunduh. Sedang mengunggah...")
+            video_response = requests.get(video_url, stream=True)
+            video_content = io.BytesIO(video_response.content)
+            video_content.name = "video.mp4"
+            await client.send_video(chat_id, video_content, supports_streaming=True, progress=progress)
+            asyncio.create_task(delete_messages(client, chat_id, upload_msg.id))
+        else:
+            await client.send_message(chat_id, "Terjadi kesalahan saat mengambil URL video.")
+    except Exception as e:
+        await client.send_message(chat_id, f"Terjadi kesalahan: {str(e)}")
 
 # Function to delete messages after some time
 async def delete_messages(client, chat_id, *message_ids):
@@ -203,9 +184,8 @@ async def delete_messages(client, chat_id, *message_ids):
         except Exception as e:
             print(f"Failed to delete message {message_id}: {e}")
 
-# Handler baru untuk perintah /do
-@app.on_message(filters.command(['do']))
-async def handle_dood_download(client, message):
+@app.on_message(filters.command(['do', 'ig', 'yt', 'tw', 'tt', 'fb']))
+async def download_and_upload_command(client, message):
     chat_id = message.chat.id
     user_id = message.from_user.id
     
@@ -213,17 +193,23 @@ async def handle_dood_download(client, message):
         command, *args = message.text.split(maxsplit=1)
         if len(args) == 1:
             url = args[0]
-
             if user_id in progress_data:
-                await client.send_message(chat_id, f"Anda masih memiliki proses unduhan/upload sebelumnya yang sedang berjalan.")
+                await client.send_message(chat_id, "Anda masih memiliki proses unduhan/upload sebelumnya yang sedang berjalan.")
             else:
                 progress_data[user_id] = True
-                # Memulai unduhan
-                await client.send_message(chat_id, "Memulai unduhan...")
-                
-                # Panggil fungsi download_and_upload dengan URL video
-                await download_and_upload(client, chat_id, url)
-                
+                platform_handlers = {
+                    '/do': download_and_upload,
+                    '/ig': handle_instagram,
+                    '/fb': handle_facebook,
+                    '/yt': handle_youtube,
+                    '/tt': handle_tiktok,
+                    '/tw': handle_twitter
+                }
+                handler = platform_handlers.get(command)
+                if handler:
+                    await handler(client, chat_id, url)
+                else:
+                    await client.send_message(chat_id, "Perintah salah. Ketik /help untuk bantuan.")
                 del progress_data[user_id]
         else:
             await client.send_message(chat_id, "Perintah salah. Ketik /help untuk bantuan.")
@@ -232,18 +218,17 @@ async def handle_dood_download(client, message):
         if user_id in progress_data:
             del progress_data[user_id]
 
-
 @app.on_message(filters.command(['start', 'help']))
 async def send_welcome(client, message):
     help_message = """
-📷 /ig [URL] - Unduh video Instagram
-📺 /yt [URL] - Ambil video YouTube
-🐦 /tw [URL] - Download video Twitter
-🎵 /tt [URL] - Unduh video TikTok
-📘 /fb [URL] - Unduh video Facebook
-💾 /do [URL] - Unduh video dari Doodstream
+📷 /do [URL] - Unduh video dari DoodStream
+📷 /ig [URL] - Unduh video dari Instagram
+📷 /fb [URL] - Unduh video dari Facebook
+📷 /yt [URL] - Unduh video dari YouTube
+📷 /tt [URL] - Unduh video dari TikTok
+📷 /tw [URL] - Unduh video dari Twitter
 """
     await client.reply_text(f"Selamat datang! Gunakan perintah berikut:\n{help_message}")
 
-# Menjalankan bot
+# Run the bot
 app.run()
