@@ -148,7 +148,7 @@ def get_video_url(url, platform):
         "Content-Type": "application/json"
     }
     data = {"url": url}
-    response = requests.post("https://co.wuk.sh/api/json", headers=headers, json(data))
+    response = requests.post("https://co.wuk.sh/api/json", headers=headers, json=data)
     result = response.json()
     return result.get("url", None)
 
