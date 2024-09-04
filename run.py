@@ -21,7 +21,7 @@ async def progress(current, total):
     print(f"{current * 100 / total:.1f}%")
 
 # Fungsi untuk download video Doodstream
-def dood_download(url, file_path):
+def dood_download(url):
     def dood_decode(data):
         t = string.ascii_letters + string.digits
         return data + ''.join([random.choice(t) for _ in range(10)])
@@ -75,15 +75,19 @@ def dood_download(url, file_path):
         
         response = requests.get(vid_src, stream=True, headers=headers)
         if response.status_code == 200:
-            with open(file_path, 'wb') as file:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        file.write(chunk)
-            print(f'Download completed')
+            video_content = io.BytesIO()
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    video_content.write(chunk)
+            video_content.seek(0)  # Reset pointer to the start of the BytesIO object
+            return video_content
         else:
             print(f'Failed to download file')
+            return None
     else:
         print('Video Not Found')
+        return None
+
 
 # Fungsi baru untuk mendapatkan URL video Facebook
 def Facebook(api_url, fb_url):
@@ -209,7 +213,6 @@ async def handle_dood_download(client, message):
         command, *args = message.text.split(maxsplit=1)
         if len(args) == 1:
             url = args[0]
-            file_path = "video.mp4"  # Lokasi file yang akan diunduh
 
             if user_id in progress_data:
                 await client.send_message(chat_id, f"Anda masih memiliki proses unduhan/upload sebelumnya yang sedang berjalan.")
@@ -218,11 +221,9 @@ async def handle_dood_download(client, message):
                 # Memulai unduhan
                 await client.send_message(chat_id, "Memulai unduhan...")
                 
-                # Panggil fungsi dood_download
-                dood_download(url, file_path)
+                # Panggil fungsi download_and_upload dengan URL video
+                await download_and_upload(client, chat_id, url)
                 
-                # Mengirim file ke Telegram setelah diunduh
-                await client.send_video(chat_id, file_path, supports_streaming=True)
                 del progress_data[user_id]
         else:
             await client.send_message(chat_id, "Perintah salah. Ketik /help untuk bantuan.")
@@ -230,6 +231,7 @@ async def handle_dood_download(client, message):
         await client.send_message(chat_id, f"Terjadi kesalahan: {str(e)}")
         if user_id in progress_data:
             del progress_data[user_id]
+
 
 @app.on_message(filters.command(['start', 'help']))
 async def send_welcome(client, message):
