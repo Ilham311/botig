@@ -17,19 +17,30 @@ progress_data = {}
 async def progress(current, total):
     print(f"{current * 100 / total:.1f}%")
 
-# Fungsi baru untuk mendapatkan URL video Facebook
-def Facebook(api_url, fb_url):
+# Fungsi untuk mendapatkan URL video Instagram
+def get_instagram_media(instagram_url):
+    api_url = "https://auto-download-all-in-one.p.rapidapi.com/v1/social/autolink"
+    headers = {
+        "x-rapidapi-key": "da2822c5a9msh3665ef1bee3ad2cp1ab549jsn457a3b017e06",
+        "x-rapidapi-host": "auto-download-all-in-one.p.rapidapi.com",
+        "content-type": "application/json; charset=UTF-8",
+        "accept-encoding": "gzip",
+        "user-agent": "okhttp/3.14.9"
+    }
+    data = {"url": instagram_url}
+    response = requests.post(api_url, json=data, headers=headers)
+    return response.json()
+
+# Fungsi untuk mendapatkan URL video Facebook
+def get_facebook_video_url(fb_url):
+    api_url = "https://vdfr.aculix.net/fb"
     headers = {
         'authorization': 'erg4t5hyj6u75u64y5ht4gf3er4gt5hy6uj7k8l9',
         'accept-encoding': 'gzip',
         'user-agent': 'okhttp/4.12.0'
     }
-
-    # Format ulang api_url dengan fb_url
     full_url = f"{api_url}?url={fb_url}"
-
     response = requests.get(full_url, headers=headers)
-
     if response.status_code == 200:
         data = response.json()
         if 'media' in data and data['media'][0]['is_video']:
@@ -39,6 +50,7 @@ def Facebook(api_url, fb_url):
     else:
         return None
 
+# Fungsi untuk mendapatkan URL video TikTok
 def get_tiktok_play_url(api_url):
     response = requests.get(api_url, headers={
         'Accept-Encoding': 'gzip',
@@ -46,7 +58,6 @@ def get_tiktok_play_url(api_url):
         'Host': 'www.tikwm.com',
         'Connection': 'Keep-Alive'
     })
-
     try:
         data = json.loads(response.text)
         play_url = data.get('data', {}).get('play')
@@ -54,26 +65,7 @@ def get_tiktok_play_url(api_url):
     except json.JSONDecodeError:
         return None
 
-# Function to get Instagram video URL
-def get_instagram_video_url(ig_url):
-    url = "https://backend.live/rapid"
-    headers = {
-        "x-api-key": "i094kjad090asd43094@asdj4390945",
-        "content-type": "application/json; charset=utf-8",
-        "accept-encoding": "gzip",
-        "user-agent": "okhttp/5.0.0-alpha.10"
-    }
-    data = {"url": ig_url}
-    try:
-        response = requests.post(url, headers=headers, json=data)
-        response.raise_for_status()
-        response_data = response.json()
-        return response_data.get("video_url", None)
-    except requests.exceptions.RequestException as e:
-        print(f"Request error: {e}")
-        return None
-
-# Function to get video URL for other platforms
+# Fungsi untuk mendapatkan URL video YouTube atau platform lainnya
 def get_video_url(url, platform):
     headers = {
         "Accept": "application/json",
@@ -84,34 +76,39 @@ def get_video_url(url, platform):
     result = response.json()
     return result.get("url", None)
 
-# Download and upload functions for each platform
+# Download dan upload untuk Instagram
 async def handle_instagram(client, chat_id, url):
-    video_url = get_instagram_video_url(url)
-    await download_and_upload(client, chat_id, video_url)
+    media_data = get_instagram_media(url)
+    if media_data and not media_data.get('error'):
+        video_url = media_data['medias'][0]['url']
+        await download_and_upload(client, chat_id, video_url)
+    else:
+        await client.send_message(chat_id, "Gagal mendapatkan video dari Instagram.")
 
+# Download dan upload untuk Facebook
 async def handle_facebook(client, chat_id, url):
-    api_url = 'https://vdfr.aculix.net/fb'
-    video_url = Facebook(api_url, url)  # Menggunakan fungsi Facebook yang baru
+    video_url = get_facebook_video_url(url)
     await download_and_upload(client, chat_id, video_url)
 
+# Download dan upload untuk YouTube
 async def handle_youtube(client, chat_id, url):
     video_url = get_video_url(url, 'YouTube')
     await download_and_upload(client, chat_id, video_url)
 
+# Download dan upload untuk TikTok
 async def handle_tiktok(client, chat_id, url):
     tikwm_api_url = f'https://www.tikwm.com/api/?url={url}'
     video_url = get_tiktok_play_url(tikwm_api_url)
-
     if not video_url:
         video_url = get_video_url(url, 'TikTok')
-
     await download_and_upload(client, chat_id, video_url)
 
+# Download dan upload untuk Twitter
 async def handle_twitter(client, chat_id, url):
     video_url = get_video_url(url, 'Twitter')
     await download_and_upload(client, chat_id, video_url)
 
-# Function to download and upload video
+# Fungsi untuk mengunduh dan mengunggah video
 async def download_and_upload(client, chat_id, video_url):
     if video_url:
         upload_msg = await client.send_message(chat_id, "Video berhasil diunduh. Sedang mengunggah...")
@@ -123,7 +120,7 @@ async def download_and_upload(client, chat_id, video_url):
     else:
         await client.send_message(chat_id, "Terjadi kesalahan saat mengambil URL video.")
 
-# Function to delete messages after some time
+# Fungsi untuk menghapus pesan setelah beberapa waktu
 async def delete_messages(client, chat_id, *message_ids):
     for message_id in message_ids:
         try:
@@ -131,6 +128,7 @@ async def delete_messages(client, chat_id, *message_ids):
         except Exception as e:
             print(f"Failed to delete message {message_id}: {e}")
 
+# Menangani perintah unduh dan unggah
 @app.on_message(filters.command(['ig', 'yt', 'tw', 'tt', 'fb']))
 async def download_and_upload_command(client, message):
     chat_id = message.chat.id
@@ -164,6 +162,7 @@ async def download_and_upload_command(client, message):
         if user_id in progress_data:
             del progress_data[user_id]
 
+# Menangani perintah /start dan /help
 @app.on_message(filters.command(['start', 'help']))
 async def send_welcome(client, message):
     help_message = """
@@ -175,5 +174,5 @@ async def send_welcome(client, message):
 """
     await client.reply_text(f"Selamat datang! Gunakan perintah berikut:\n{help_message}")
 
-# Run the bot
+# Menjalankan bot
 app.run()
