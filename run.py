@@ -11,11 +11,30 @@ BOT_TOKEN = "7375007973:AAEqgy2z2J2-Xii_wOhea98BmwMSdW82bHM"
 
 app = Client("my_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-# Dictionary to store progress information for each user
 progress_data = {}
 
 async def progress(current, total):
     print(f"{current * 100 / total:.1f}%")
+
+# Fungsi untuk API Twitter
+def twitter_api(twitter_url):
+    u = "https://twitter-downloader-download-twitter-videos-gifs-and-images.p.rapidapi.com/status"
+    q = {"url": twitter_url}
+    h = {
+        "x-rapidapi-key": "4f281a1be0msh5baa41ebeeda439p1d1139jsn3c26d05da8dd",
+        "x-rapidapi-host": "twitter-downloader-download-twitter-videos-gifs-and-images.p.rapidapi.com",
+        "accept-encoding": "gzip",
+        "user-agent": "okhttp/4.10.0"
+    }
+
+    r = requests.get(u, headers=h, params=q)
+
+    if r.status_code == 200:
+        d = r.json()
+        for v in d['media']['video']['videoVariants']:
+            if v['content_type'] == "video/mp4":
+                return v['url']
+    return None
 
 # Fungsi untuk mendapatkan URL video Instagram
 def get_instagram_media(instagram_url):
@@ -105,7 +124,7 @@ async def handle_tiktok(client, chat_id, url):
 
 # Download dan upload untuk Twitter
 async def handle_twitter(client, chat_id, url):
-    video_url = get_video_url(url, 'Twitter')
+    video_url = twitter_api(url)
     await download_and_upload(client, chat_id, video_url)
 
 # Fungsi untuk mengunduh dan mengunggah video
