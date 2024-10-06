@@ -12,7 +12,7 @@
         - "apt-get update && apt-get install -y supervisor"
         - "pip install --root-user-action=ignore -r requirements.txt"  # Mengabaikan peringatan pip
         - "mkdir -p /etc/supervisor/"  # Membuat folder untuk supervisord.conf
-        - "cp /path/to/your/supervisord.conf /etc/supervisor/supervisord.conf"  # Salin file supervisord.conf ke lokasi yang benar
+        - "cp supervisord.conf /etc/supervisor/supervisord.conf"  # Salin file supervisord.conf ke lokasi yang benar
         - "supervisord -c /etc/supervisor/supervisord.conf"  # Gunakan path yang benar ke file supervisord.conf
       cached_dirs:
         - "/root/.cache/pip"
