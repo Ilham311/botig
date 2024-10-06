@@ -1,6 +1,6 @@
 - pipeline: "Deploy"
   events:
-    - type: "DEPLOY"
+    - type: "PUSH"
       refs:
         - "refs/heads/main"
   actions:
