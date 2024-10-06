@@ -12,7 +12,7 @@
         - "apt-get update && apt-get install -y supervisor"
         - "pip install --root-user-action=ignore -r requirements.txt"
         - "mkdir -p /etc/supervisor/"
-        - "cp /path/to/your/supervisord.conf /etc/supervisor/supervisord.conf"
+        - "cp supervisord.conf /etc/supervisor/supervisord.conf"
         - "supervisord -c /etc/supervisor/supervisord.conf &"  # Menjalankan supervisord di background
         - "echo 'Supervisor started successfully'"  # Menampilkan pesan sukses
       cached_dirs:
