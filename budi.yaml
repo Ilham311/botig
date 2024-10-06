@@ -14,8 +14,6 @@
         - "mkdir -p /etc/supervisor/"
         - "cp supervisord.conf /etc/supervisor/supervisord.conf"
         - "supervisord -c /etc/supervisor/supervisord.conf &"
-        - "echo 'Supervisor started successfully'"
-        - "exit 0"  # Menyelesaikan pipeline dengan sukses
       cached_dirs:
         - "/root/.cache/pip"
       shell: "BASH"
