@@ -1,0 +1,7 @@
+actions:
+  - action: "docker-compose up"
+    type: "BUILD"
+    docker_image_name: "docker/compose"
+    docker_image_tag: "latest"
+    execute_commands:
+    - "docker-compose up -d"
