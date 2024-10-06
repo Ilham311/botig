@@ -1,6 +1,6 @@
 - pipeline: "Deploy"
   events:
-    - type: "PUSH"  # Trigger pipeline saat ada push ke branch
+    - type: "PUSH"
       refs:
         - "refs/heads/main"
   actions:
@@ -10,8 +10,10 @@
       docker_image_tag: "3.12"
       execute_commands:
         - "apt-get update && apt-get install -y supervisor"
-        - "pip install -r requirements.txt"
-        - "supervisord -c /path/to/supervisord.conf"  # Menjalankan supervisor yang mengawasi run.py
+        - "pip install --root-user-action=ignore -r requirements.txt"  # Mengabaikan peringatan pip
+        - "mkdir -p /etc/supervisor/"  # Membuat folder untuk supervisord.conf
+        - "cp supervisord.conf /etc/supervisor/supervisord.conf"  # Salin file supervisord.conf ke lokasi yang benar
+        - "supervisord -c /etc/supervisor/supervisord.conf"  # Gunakan path yang benar ke file supervisord.conf
       cached_dirs:
         - "/root/.cache/pip"
       shell: "BASH"
