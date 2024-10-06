@@ -1,16 +1,20 @@
-  - action: "install supervisor"
-    type: "BUILD"
-    docker_image_name: "library/python"
-    docker_image_tag: "3.12"
-    execute_commands:
-    - "apt-get update && apt-get install -y supervisor"
-    - "pip install --root-user-action=ignore -r requirements.txt"
-    - "mkdir -p /etc/supervisor/"
-    - "cp supervisord.conf /etc/supervisor/supervisord.conf"
-    - "supervisord -c /etc/supervisor/supervisord.conf"
-    cached_dirs:
-    - "/root/.cache/pip"
-    ignore_errors: true
-    shell: "BASH"
-    execute_every_command: true
-  
+- pipeline: "Deploy"
+  events:
+    - type: "DEPLOY"
+      refs:
+        - "refs/heads/main"
+  actions:
+    - action: "install supervisor"
+      type: "BUILD"
+      docker_image_name: "library/python"
+      docker_image_tag: "3.12"
+      execute_commands:
+        - "apt-get update && apt-get install -y supervisor"
+        - "pip install --root-user-action=ignore -r requirements.txt"  # Mengabaikan peringatan pip
+        - "mkdir -p /etc/supervisor/"  # Membuat folder untuk supervisord.conf
+        - "cp /path/to/your/supervisord.conf /etc/supervisor/supervisord.conf"  # Salin file supervisord.conf ke lokasi yang benar
+        - "supervisord -c /etc/supervisor/supervisord.conf"  # Gunakan path yang benar ke file supervisord.conf
+      cached_dirs:
+        - "/root/.cache/pip"
+      shell: "BASH"
+      execute_every_command: true
